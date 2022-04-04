@@ -53,6 +53,13 @@ public class Server {
                 int code = sc1.read(buffer);
                 if (code > 0){
                     //如果没有读取到内容 那么read返回值就是0
+                    String msg = new String(buffer.array());
+                    if ("bye".equals(msg.substring(0,3))){
+                        channels.remove(sc1);
+                        if (channels.size() == 0){
+                            break;
+                        }
+                    }
                     System.out.println(buffer.toString());
                     //调转读写模式
                     buffer.flip();
