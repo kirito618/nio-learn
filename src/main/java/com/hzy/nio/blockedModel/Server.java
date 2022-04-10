@@ -58,15 +58,29 @@ public class Server {
                     socketKey.interestOps(SelectionKey.OP_READ);
                     System.out.println("连接上了！client：" + sc.getRemoteAddress());
                 }else if (key.isReadable()) {
-                    //是可读事件
-                    //拿到出发这个事件的那个channel
-                    SocketChannel selectableChannel = (SocketChannel) key.channel();
-                    ByteBuffer buffer = ByteBuffer.allocate(16);
-                    //把数据从channel读，向buffer写
-                    selectableChannel.read(buffer);
-                    System.out.println(selectableChannel.getRemoteAddress() + "说: " + new String(buffer.array()));
-                    //调转buffer读写模式
-                    buffer.flip();
+                    try{
+                        //是可读事件
+                        //拿到出发这个事件的那个channel
+                        SocketChannel selectableChannel = (SocketChannel) key.channel();
+                        ByteBuffer buffer = ByteBuffer.allocate(16);
+                        //把数据从channel读，向buffer写
+                        int read = selectableChannel.read(buffer);
+                        //如果是不正常的断开，那么selectableChannel这个对象就不存在了，无法向buffer写入内容，会报IO异常
+                        //这里是处理 正常断开时 的操作，如果是正常断开 那么这个channel里就没有内容了，read会返回-1
+                        if (read == -1){
+                            key.cancel();
+                        }else{
+                            System.out.println(selectableChannel.getRemoteAddress() + "说: " + new String(buffer.array()));
+                            //调转buffer读写模式
+                            buffer.flip();
+                        }
+                    }catch (IOException e){
+                        System.out.println("有客户端断开连接了...");
+                        //删除这个key，保证下一次进循环时 能够让selector正常工作
+                        //如果没删，只是捕捉异常的话，会死循环的，因为这个key已经读不到东西了，一读就异常，然后被catch，相当于没有被做处理，那么下次还会轮到这个key，死循环
+                        key.cancel();
+                    }
+
                 }
             }
         }

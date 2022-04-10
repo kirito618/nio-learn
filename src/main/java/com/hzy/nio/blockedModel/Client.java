@@ -18,6 +18,8 @@ public class Client implements Runnable{
                 String msg = scanner.nextLine();
                 sc.write(Charset.defaultCharset().encode(msg));
                 if ("bye".equals(msg)){
+                    //输入 bye 之后断开连接
+                    sc.close();
                     break;
                 }
             }
