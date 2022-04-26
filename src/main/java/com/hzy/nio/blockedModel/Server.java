@@ -16,6 +16,34 @@ import java.util.List;
  * @author hzy
 **/
 public class Server {
+    //把buffer的内容进行截取，相当于是在截取消息
+    public static void split(ByteBuffer buffer){
+        //调转成读模式
+        buffer.flip();
+        for (int i=0;i<buffer.limit();i++){
+            if (buffer.get(i)=='\n'){
+                //读到换行符，说明这里阔以截取了
+                //截取的长度：i + 1代表当前读到第几个字符了，由于每次碰到分隔符，就是一个完整句子
+                //而完整句子的开始下标是 position 所以减去position
+                int length = i + 1 - buffer.position();
+                //把分割后的完整消息存入到新的ByteBuffer
+                ByteBuffer target = ByteBuffer.allocate(length);
+
+                //从buffer中读，向target中写入
+                for (int j=0;j<length;j++){
+                    //由于get方法没有传入i 所以会改变position指针
+                    target.put(buffer.get());
+                }
+                //HeapByteBuffer 是堆内存缓冲区
+            }
+        }
+        //切换读写模式，compact可以把当前未读到的内容向左进行覆盖
+        buffer.compact();
+    }
+
+
+
+
     public static void main(String[] args) throws IOException {
         //1、创建一个selector监听器
         Selector selector = Selector.open();
@@ -53,7 +81,9 @@ public class Server {
                     sc.configureBlocking(false);
                     //把建立的连接SocketChannel通道也注册到selector中去
                     //这个SelectionKey就专门对应SocketChannel中发生的事件
-                    SelectionKey socketKey = sc.register(selector,0,null);
+                    //第三个参数称为附件，将和我们的channel进行对应 关联到selectionKey 对于消息的处理，我们每个channel都应该有自己的buffer，所以buffer可以作为附件
+                    ByteBuffer buffer = ByteBuffer.allocate(16);
+                    SelectionKey socketKey = sc.register(selector,0,buffer);
                     //对于这个channel 只关注读事件
                     socketKey.interestOps(SelectionKey.OP_READ);
                     System.out.println("连接上了！client：" + sc.getRemoteAddress());
@@ -62,7 +92,8 @@ public class Server {
                         //是可读事件
                         //拿到出发这个事件的那个channel
                         SocketChannel selectableChannel = (SocketChannel) key.channel();
-                        ByteBuffer buffer = ByteBuffer.allocate(16);
+                        //拿到注册时 作为附件的那个ByteBuffer
+                        ByteBuffer buffer = (ByteBuffer) key.attachment();
                         //把数据从channel读，向buffer写
                         int read = selectableChannel.read(buffer);
                         //如果是不正常的断开，那么selectableChannel这个对象就不存在了，无法向buffer写入内容，会报IO异常
@@ -70,9 +101,21 @@ public class Server {
                         if (read == -1){
                             key.cancel();
                         }else{
-                            System.out.println(selectableChannel.getRemoteAddress() + "说: " + new String(buffer.array()));
+                            //截取消息
+                            split(buffer);
+                            if (buffer.position() == buffer.limit()){
+                                //消息太长了，读满了buffer，仍然有剩余，就新开辟空间，创建更大(2倍大小)的buffer
+                                ByteBuffer newBuffer = ByteBuffer.allocate(buffer.capacity()*2);
+                                //调转buffer读写模式，变成读模式
+                                buffer.flip();
+                                //从buffer读 向newBuffer写,把上次读入的内容复制到新的buffer中去
+                                newBuffer.put(buffer);
+                                //更换key所绑定的那个buffer，换成新的
+                                key.attach(newBuffer);
+                            }
                             //调转buffer读写模式
                             buffer.flip();
+                            System.out.println(new String(buffer.array()));
                         }
                     }catch (IOException e){
                         System.out.println("有客户端断开连接了...");

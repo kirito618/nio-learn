@@ -17,13 +17,15 @@ public class Client implements Runnable{
             while (true){
                 String msg = scanner.nextLine();
                 sc.write(Charset.defaultCharset().encode(msg));
-                if ("bye".equals(msg)){
-                    //输入 bye 之后断开连接
-                    sc.close();
-                    break;
-                }
+//                sc.write(Charset.defaultCharset().encode("fuck!\nwhat are u talking about!fuck u /n"));
+//                sc.write(Charset.defaultCharset().encode("fuck!\n"));
+//                if ("bye".equals(msg)){
+//                    //输入 bye 之后断开连接
+//                    sc.close();
+//                    break;
+//                }
             }
-            System.out.println("waiting.......");
+//            System.out.println("waiting.......");
         } catch (IOException e) {
             e.printStackTrace();
         }
